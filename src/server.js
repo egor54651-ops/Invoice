@@ -45,6 +45,8 @@ export async function handleRequest(req, res) {
   }
 }
 
+export default handleRequest;
+
 export async function handleApiRequest(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
