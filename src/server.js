@@ -189,15 +189,33 @@ async function serveStatic(req, res, url) {
       return;
     }
 
-    createReadStream(filePath).pipe(res);
+    pipeFile(filePath, res);
   } catch {
     const fallbackPath = join(publicDir, 'index.html');
-    res.writeHead(200, {
-      'Content-Type': contentTypes['.html'],
-      'Cache-Control': 'no-store'
-    });
-    createReadStream(fallbackPath).pipe(res);
+    try {
+      await stat(fallbackPath);
+      res.writeHead(200, {
+        'Content-Type': contentTypes['.html'],
+        'Cache-Control': 'no-store'
+      });
+      pipeFile(fallbackPath, res);
+    } catch {
+      sendText(res, 404, 'Not found');
+    }
   }
+}
+
+function pipeFile(filePath, res) {
+  const stream = createReadStream(filePath);
+  stream.on('error', (error) => {
+    console.error(error);
+    if (!res.headersSent) {
+      sendText(res, 500, 'Unable to read file');
+      return;
+    }
+    res.destroy(error);
+  });
+  stream.pipe(res);
 }
 
 async function readBody(req) {
