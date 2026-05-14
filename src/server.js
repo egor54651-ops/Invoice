@@ -45,7 +45,7 @@ export async function handleRequest(req, res) {
   }
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (res?.writeHead) {
     await handleRequest(req, res);
     return;
@@ -53,6 +53,10 @@ export default async function handler(req, res) {
 
   return handleFetchRequest(req);
 }
+
+handler.fetch = handleFetchRequest;
+
+export default handler;
 
 export async function handleApiRequest(req, res) {
   try {
