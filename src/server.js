@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -45,7 +45,14 @@ export async function handleRequest(req, res) {
   }
 }
 
-export default handleRequest;
+export default async function handler(req, res) {
+  if (res?.writeHead) {
+    await handleRequest(req, res);
+    return;
+  }
+
+  return handleFetchRequest(req);
+}
 
 export async function handleApiRequest(req, res) {
   try {
@@ -54,6 +61,136 @@ export async function handleApiRequest(req, res) {
   } catch (error) {
     console.error(error);
     sendJson(res, error.statusCode || 500, { error: error.statusCode ? error.message : 'Internal server error' });
+  }
+}
+
+async function handleFetchRequest(request) {
+  try {
+    const url = new URL(request.url);
+
+    if (url.pathname.startsWith('/api/')) {
+      return handleFetchApi(request, url);
+    }
+
+    return serveFetchStatic(request, url);
+  } catch (error) {
+    console.error(error);
+    return jsonResponse(error.statusCode || 500, {
+      error: error.statusCode ? error.message : 'Internal server error'
+    });
+  }
+}
+
+async function handleFetchApi(request, url) {
+  if (request.method === 'GET' && url.pathname === '/api/health') {
+    return jsonResponse(200, { ok: true });
+  }
+
+  if (request.method === 'GET' && url.pathname === '/api/invoices') {
+    const invoices = await loadInvoices();
+    return jsonResponse(200, sortInvoices(invoices));
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/invoices') {
+    const body = await readFetchBody(request);
+    const seller = await readJson(sellerPath, defaultSeller);
+    const invoice = normalizeInvoice(body, seller);
+
+    if (!invoice.number) {
+      return jsonResponse(400, { error: 'Invoice number is required' });
+    }
+
+    if (invoice.items.length === 0) {
+      return jsonResponse(400, { error: 'At least one line item is required' });
+    }
+
+    const result = await upsertInvoiceCsv(invoicesCsvPath, invoice);
+    return jsonResponse(result.existed ? 200 : 201, result.invoice);
+  }
+
+  if (request.method === 'GET' && url.pathname === '/api/invoice/pdf') {
+    const id = url.searchParams.get('id');
+
+    if (!id) {
+      return jsonResponse(400, { error: 'Invoice id is required' });
+    }
+
+    const invoices = await loadInvoices();
+    const invoice = invoices.find((item) => item.id === id);
+
+    if (!invoice) {
+      return jsonResponse(404, { error: 'Invoice not found' });
+    }
+
+    const pdf = await createInvoicePdf(invoice);
+    const filename = sanitizeFilename(`invoice-${invoice.number || invoice.id}.pdf`);
+
+    return new Response(pdf, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': String(pdf.length),
+        'Cache-Control': 'no-store'
+      }
+    });
+  }
+
+  if (request.method === 'DELETE' && url.pathname === '/api/invoice') {
+    const id = url.searchParams.get('id');
+
+    if (!id) {
+      return jsonResponse(400, { error: 'Invoice id is required' });
+    }
+
+    const deleted = await deleteInvoiceCsv(invoicesCsvPath, id);
+
+    if (!deleted) {
+      return jsonResponse(404, { error: 'Invoice not found' });
+    }
+
+    return jsonResponse(200, { ok: true });
+  }
+
+  if (request.method === 'GET' && url.pathname === '/api/seller') {
+    const seller = normalizeSeller(await readJson(sellerPath, defaultSeller));
+    return jsonResponse(200, seller);
+  }
+
+  if (request.method === 'PUT' && url.pathname === '/api/seller') {
+    const seller = normalizeSeller(await readFetchBody(request));
+    await writeJson(sellerPath, seller);
+    return jsonResponse(200, seller);
+  }
+
+  return jsonResponse(404, { error: 'Not found' });
+}
+
+async function serveFetchStatic(request, url) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return textResponse(405, 'Method not allowed');
+  }
+
+  const requestedPath = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname);
+  const filePath = normalize(join(publicDir, requestedPath));
+
+  if (!filePath.startsWith(publicDir)) {
+    return textResponse(403, 'Forbidden');
+  }
+
+  try {
+    const fileStat = await stat(filePath);
+    if (!fileStat.isFile()) throw new Error('Not a file');
+
+    return fileResponse(request, filePath);
+  } catch {
+    const fallbackPath = join(publicDir, 'index.html');
+    try {
+      await stat(fallbackPath);
+      return fileResponse(request, fallbackPath);
+    } catch {
+      return textResponse(404, 'Not found');
+    }
   }
 }
 
@@ -235,6 +372,43 @@ async function readBody(req) {
     error.statusCode = 400;
     throw error;
   }
+}
+
+async function readFetchBody(request) {
+  const raw = await request.text();
+  if (!raw) return {};
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const error = new Error('Invalid JSON');
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
+async function fileResponse(request, filePath) {
+  return new Response(request.method === 'HEAD' ? null : await readFile(filePath), {
+    status: 200,
+    headers: {
+      'Content-Type': contentTypes[extname(filePath)] || 'application/octet-stream',
+      'Cache-Control': 'no-store'
+    }
+  });
+}
+
+function jsonResponse(statusCode, payload) {
+  return new Response(`${JSON.stringify(payload)}\n`, {
+    status: statusCode,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' }
+  });
+}
+
+function textResponse(statusCode, text) {
+  return new Response(text, {
+    status: statusCode,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+  });
 }
 
 function sendJson(res, statusCode, payload) {

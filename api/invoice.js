@@ -1,3 +1,3 @@
-import { handleApiRequest } from '../src/server.js';
+import handler from '../src/server.js';
 
-export default handleApiRequest;
+export default handler;
