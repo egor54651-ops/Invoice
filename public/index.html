@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ledger — Invoice Studio</title>
+  <link rel="stylesheet" href="/tabler-icons.css">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-root">
+    <h2 class="sr-only">Invoice creator</h2>
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark"><i class="ti ti-file-invoice"></i></div>
+        <div>
+          <div class="brand-title">Ledger</div>
+          <div class="brand-sub">Invoice studio</div>
+        </div>
+      </div>
+      <nav class="nav-tabs" aria-label="Primary">
+        <button class="nav-tab active" data-view="new" type="button"><i class="ti ti-plus"></i><span>New</span></button>
+        <button class="nav-tab" data-view="list" type="button"><i class="ti ti-list-details"></i><span>Invoices</span></button>
+        <button class="nav-tab" data-view="settings" type="button"><i class="ti ti-settings"></i><span>Settings</span></button>
+      </nav>
+      <button class="btn-ghost" id="export-csv" type="button"><i class="ti ti-download"></i><span>Export CSV</span></button>
+    </header>
+
+    <section id="view-new" class="view">
+      <div class="page-head">
+        <div><div class="eyebrow">Create</div><h1 class="page-title">New invoice</h1></div>
+        <div class="page-actions">
+          <button class="btn-secondary" id="clear-form" type="button"><i class="ti ti-refresh"></i><span>Reset</span></button>
+          <button class="btn-primary" id="save-invoice" type="button"><i class="ti ti-device-floppy"></i><span>Save invoice</span></button>
+        </div>
+      </div>
+      <div class="grid-2col">
+        <div class="col-main">
+          <div class="card">
+            <div class="card-head"><div class="card-title">Details</div></div>
+            <div class="card-body field-grid">
+              <div class="field"><label for="inv-number">Invoice number</label><input type="text" id="inv-number" /></div>
+              <div class="field"><label for="inv-status">Status</label>
+                <select id="inv-status">
+                  <option value="draft">Draft</option><option value="sent">Sent</option>
+                  <option value="paid">Paid</option><option value="overdue">Overdue</option>
+                </select>
+              </div>
+              <div class="field"><label for="inv-date">Issue date</label><input type="date" id="inv-date" /></div>
+              <div class="field"><label for="inv-due">Due date</label><input type="date" id="inv-due" /></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title">Customer</div><div class="card-sub">Bill to</div></div>
+            <div class="card-body field-grid">
+              <div class="field"><label for="cust-name">Name</label><input type="text" id="cust-name" placeholder="Jane Doe" /></div>
+              <div class="field"><label for="cust-email">Email</label><input type="email" id="cust-email" placeholder="jane@example.com" /></div>
+              <div class="field field-wide"><label for="cust-address">Address</label><input type="text" id="cust-address" /></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">Line items</div>
+              <button class="btn-ghost btn-sm" id="add-item" type="button"><i class="ti ti-plus"></i><span>Add line</span></button>
+            </div>
+            <div class="card-body card-body-flush">
+              <div class="items-header">
+                <div>Description</div><div class="num">Qty</div><div class="num">Unit price</div>
+                <div class="num">VAT %</div><div class="num">Total</div><div></div>
+              </div>
+              <div id="items-container"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title">Notes</div></div>
+            <div class="card-body"><textarea id="inv-notes" rows="3" placeholder="Payment terms, bank details..."></textarea></div>
+          </div>
+        </div>
+        <aside class="col-side">
+          <div class="card summary-card">
+            <div class="summary-head">
+              <div class="eyebrow">Summary</div>
+              <div class="summary-number" id="summary-number">—</div>
+            </div>
+            <div>
+              <div class="summary-row"><span>Subtotal</span><span id="sum-subtotal">€0.00</span></div>
+              <div class="summary-row"><span>VAT</span><span id="sum-vat">€0.00</span></div>
+              <div class="summary-divider"></div>
+              <div class="summary-total"><span>Total due</span><span id="sum-total">€0.00</span></div>
+            </div>
+            <div class="summary-meta">
+              <div class="meta-row"><span>Items</span><span id="meta-items">0</span></div>
+              <div class="meta-row"><span>Currency</span><span id="meta-currency">EUR</span></div>
+            </div>
+            <div id="save-status-wrap" class="save-status"></div>
+          </div>
+          <div class="hint-card">
+            <i class="ti ti-info-circle"></i>
+            <div>
+              <div class="hint-title">B2C invoicing tip</div>
+              <div class="hint-body">Belgian VAT defaults to 21%. Use 6% for select essentials. Adjust per line as needed.</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="view-list" class="view" hidden>
+      <div class="page-head"><div><div class="eyebrow">Library</div><h1 class="page-title">All invoices</h1></div></div>
+      <div id="list-stats" class="stats-grid"></div>
+      <div id="list-container"></div>
+    </section>
+
+    <section id="view-settings" class="view" hidden>
+      <div class="page-head">
+        <div><div class="eyebrow">Configure</div><h1 class="page-title">Settings</h1></div>
+        <div class="page-actions">
+          <button class="btn-primary" id="save-seller" type="button"><i class="ti ti-check"></i><span>Save</span></button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title">Your business</div><div class="card-sub">Appears on every invoice</div></div>
+        <div class="card-body field-grid">
+          <div class="field field-wide"><label for="seller-name">Business name</label><input type="text" id="seller-name" /></div>
+          <div class="field field-wide"><label for="seller-address">Address</label><input type="text" id="seller-address" /></div>
+          <div class="field"><label for="seller-vat">VAT / Tax ID</label><input type="text" id="seller-vat" /></div>
+          <div class="field"><label for="seller-email">Email</label><input type="email" id="seller-email" /></div>
+          <div class="field"><label for="seller-vat-rate">Default VAT %</label><input type="number" id="seller-vat-rate" value="21" min="0" max="100" step="0.1" /></div>
+          <div class="field"><label for="seller-currency">Currency</label>
+            <select id="seller-currency">
+              <option value="€">€ Euro</option><option value="$">$ US Dollar</option>
+              <option value="£">£ Pound Sterling</option><option value="CHF">CHF Swiss Franc</option>
+              <option value="kr">kr Krona</option>
+            </select>
+          </div>
+          <div class="field field-wide"><div id="settings-status" class="save-status"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-detail" class="view" hidden></section>
+  </div>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "invoice-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A lightweight invoice generation app with CSV-backed invoice history and PDF downloads.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pdfkit": "^0.18.0"
+  }
+}
