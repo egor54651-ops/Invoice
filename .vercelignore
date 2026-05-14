@@ -1,0 +1,4 @@
+data/**
+server*.log
+vercel-dev*.log
+.env

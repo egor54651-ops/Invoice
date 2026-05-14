@@ -9,7 +9,7 @@ invoice-studio/
   public/
     index.html      # App shell
     styles.css      # UI styles
-    app.js          # Frontend state, forms, views, CSV export
+    client.js       # Frontend state, forms, views, CSV export
   src/
     server.js       # Static server and API routes
     lib/
