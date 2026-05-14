@@ -1,0 +1,11 @@
+{
+  "buildCommand": "npm install",
+  "outputDirectory": "public",
+  "devCommand": "npm run dev",
+  "env": [],
+  "functions": {
+    "src/server.js": {
+      "runtime": "nodejs20.x"
+    }
+  }
+}
