@@ -198,7 +198,7 @@ async function serveFetchStatic(request, url) {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === currentFile) {
+if (process.env.VERCEL || (process.argv[1] && resolve(process.argv[1]) === currentFile)) {
   const server = createServer(handleRequest);
 
   server.listen(port, () => {
