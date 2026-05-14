@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { defaultSeller, normalizeInvoice, normalizeSeller, sortInvoices } from './lib/invoices.js';
 import { readJson, writeJson } from './lib/fileStore.js';
@@ -9,9 +10,10 @@ import { createInvoicePdf } from './lib/pdfInvoice.js';
 import { deleteInvoiceCsv, readInvoicesCsv, upsertInvoiceCsv, writeInvoicesCsv } from './lib/csvInvoiceStore.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const currentFile = fileURLToPath(import.meta.url);
 const rootDir = resolve(__dirname, '..');
 const publicDir = join(rootDir, 'public');
-const dataDir = join(rootDir, 'data');
+const dataDir = process.env.VERCEL ? join(tmpdir(), 'invoice-studio-data') : join(rootDir, 'data');
 const invoicesCsvPath = join(dataDir, 'invoices.csv');
 const invoicesJsonPath = join(dataDir, 'invoices.json');
 const sellerPath = join(dataDir, 'seller.json');
@@ -27,7 +29,7 @@ const contentTypes = {
   '.ico': 'image/x-icon'
 };
 
-const server = createServer(async (req, res) => {
+export async function handleRequest(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -41,11 +43,25 @@ const server = createServer(async (req, res) => {
     console.error(error);
     sendJson(res, error.statusCode || 500, { error: error.statusCode ? error.message : 'Internal server error' });
   }
-});
+}
 
-server.listen(port, () => {
-  console.log(`Invoice Studio running at http://localhost:${port}`);
-});
+export async function handleApiRequest(req, res) {
+  try {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    await handleApi(req, res, url);
+  } catch (error) {
+    console.error(error);
+    sendJson(res, error.statusCode || 500, { error: error.statusCode ? error.message : 'Internal server error' });
+  }
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === currentFile) {
+  const server = createServer(handleRequest);
+
+  server.listen(port, () => {
+    console.log(`Invoice Studio running at http://localhost:${port}`);
+  });
+}
 
 async function handleApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/health') {

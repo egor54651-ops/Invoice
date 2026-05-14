@@ -1,10 +1,6 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm install",
   "outputDirectory": "public",
-  "devCommand": "npm run dev",
-  "functions": {
-    "src/server.js": {
-      "runtime": "nodejs20.x"
-    }
-  }
+  "devCommand": "npm run dev"
 }
